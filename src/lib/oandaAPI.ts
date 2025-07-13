@@ -56,15 +56,40 @@ class OandaAPI {
         }
       )
 
-      return response.data.candles.map((candle: any) => ({
-        pair: 'EUR/USD',
-        timestamp: new Date(candle.time).toISOString(),
-        open: parseFloat(candle.mid.o),
-        high: parseFloat(candle.mid.h),
-        low: parseFloat(candle.mid.l),
-        close: parseFloat(candle.mid.c),
-        volume: candle.volume
-      }))
+
+
+      return response.data.candles
+        .filter((candle: any) => candle && candle.time && candle.mid)
+        .map((candle: any) => {
+          // Validate and parse the timestamp
+          let timestamp: string
+          try {
+            // OANDA timestamps are Unix timestamps in seconds with nanosecond precision
+            // Convert from seconds to milliseconds for JavaScript Date
+            const unixTimestamp = parseFloat(candle.time)
+            const date = new Date(unixTimestamp * 1000)
+            
+            if (isNaN(date.getTime())) {
+              console.warn('Invalid timestamp in candle data:', candle.time)
+              return null
+            }
+            timestamp = date.toISOString()
+          } catch (error) {
+            console.warn('Error parsing timestamp:', candle.time, error)
+            return null
+          }
+
+          return {
+            pair: 'EUR/USD',
+            timestamp,
+            open: parseFloat(candle.mid.o),
+            high: parseFloat(candle.mid.h),
+            low: parseFloat(candle.mid.l),
+            close: parseFloat(candle.mid.c),
+            volume: candle.volume || 0
+          }
+        })
+        .filter((item: any) => item !== null)
     } catch (error) {
       console.error('Error fetching historical data:', error)
       throw error
@@ -98,6 +123,26 @@ class OandaAPI {
       )
 
       const order = response.data.orderFillTransaction
+      
+      // Validate and parse the timestamp
+      let openTime: string
+      try {
+        // OANDA timestamps are Unix timestamps in seconds with nanosecond precision
+        // Convert from seconds to milliseconds for JavaScript Date
+        const unixTimestamp = parseFloat(order.time)
+        const date = new Date(unixTimestamp * 1000)
+        
+        if (isNaN(date.getTime())) {
+          console.warn('Invalid timestamp in order data:', order.time)
+          openTime = new Date().toISOString() // Use current time as fallback
+        } else {
+          openTime = date.toISOString()
+        }
+      } catch (error) {
+        console.warn('Error parsing order timestamp:', order.time, error)
+        openTime = new Date().toISOString() // Use current time as fallback
+      }
+
       return {
         id: order.id,
         pair: 'EUR/USD',
@@ -106,7 +151,7 @@ class OandaAPI {
         openPrice: parseFloat(order.price),
         stopLoss: stopLoss || 0,
         takeProfit: takeProfit || 0,
-        openTime: new Date(order.time).toISOString(),
+        openTime,
         status: 'open',
         confidence: 0.8,
         strategy: 'AI-Technical'

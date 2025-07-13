@@ -149,3 +149,74 @@ export interface AlertConfig {
   riskLimits: boolean;
   systemErrors: boolean;
 } 
+
+// Live Trading Configuration
+export interface LiveTradingConfig {
+  oanda: {
+    apiKey: string
+    accountId: string
+    environment: 'demo' | 'live'
+    maxRetries: number
+    timeout: number
+  }
+  risk: {
+    maxDailyLossPercent: number
+    maxPositionSize: number
+    maxConcurrentTrades: number
+    riskPerTrade: number
+    stopLossPips: number
+    takeProfitPips: number
+    emergencyStopLoss: number
+    autoCloseOnDrawdown: boolean
+    maxDrawdownPercent: number
+  }
+  ai: {
+    confidenceThreshold: number
+    learningRate: number
+    trainingEpochs: number
+    retrainFrequency: number
+  }
+  safety: {
+    requireManualConfirmation: boolean
+    enableEmergencyStop: boolean
+    enableLiveTradingWarnings: boolean
+    enableRiskAlerts: boolean
+    enableTradeNotifications: boolean
+    maxConsecutiveLosses: number
+    pauseOnConsecutiveLosses: boolean
+  }
+  monitoring: {
+    logLevel: 'debug' | 'info' | 'warn' | 'error'
+    saveTradeHistory: boolean
+    backupFrequency: number
+    performanceReportFrequency: number
+  }
+  tradingHours: {
+    enabled: boolean
+    start: string
+    end: string
+    timezone: string
+  }
+}
+
+// Live Trading State
+export interface LiveTradingState {
+  isLive: boolean
+  isConnected: boolean
+  accountVerified: boolean
+  emergencyStopActive: boolean
+  consecutiveLosses: number
+  dailyPnL: number
+  lastTradeTime: Date | null
+  sessionStartTime: Date
+  totalTrades: number
+  warnings: string[]
+  errors: string[]
+}
+
+// Emergency Stop Reason
+export interface EmergencyStopReason {
+  type: 'daily_loss' | 'consecutive_losses' | 'drawdown' | 'manual' | 'connection_lost' | 'account_error'
+  message: string
+  timestamp: Date
+} 

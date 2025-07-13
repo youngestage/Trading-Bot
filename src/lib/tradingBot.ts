@@ -46,6 +46,7 @@ export class TradingBot {
   private onError?: (error: string) => void
   private onIndicatorsUpdate?: (indicators: TechnicalIndicators) => void
   private onAISignal?: (signal: AISignal) => void
+  private onTradeConfirmationRequired?: (trade: Partial<Trade>) => Promise<boolean>
 
   constructor(config: BotConfig) {
     this.config = config
@@ -58,8 +59,25 @@ export class TradingBot {
     this.oandaAPI = new OandaAPI(oandaConfig)
   }
 
+  // Test OANDA connection
+  async testConnection(): Promise<boolean> {
+    if (!this.oandaAPI) {
+      throw new Error('OANDA API not initialized')
+    }
+    
+    try {
+      const connected = await this.oandaAPI.testConnection()
+      if (!connected) {
+        throw new Error('Failed to connect to OANDA API')
+      }
+      return true
+    } catch (error) {
+      throw error
+    }
+  }
+
   // Set event callbacks
-  setCallbacks(callbacks: {
+  setEventCallbacks(callbacks: {
     onPriceUpdate?: (price: number) => void
     onTradeExecuted?: (trade: Trade) => void
     onPositionUpdate?: (positions: Position[]) => void
@@ -67,6 +85,7 @@ export class TradingBot {
     onError?: (error: string) => void
     onIndicatorsUpdate?: (indicators: TechnicalIndicators) => void
     onAISignal?: (signal: AISignal) => void
+    onTradeConfirmationRequired?: (trade: Partial<Trade>) => Promise<boolean>
   }): void {
     this.onPriceUpdate = callbacks.onPriceUpdate
     this.onTradeExecuted = callbacks.onTradeExecuted
@@ -75,6 +94,7 @@ export class TradingBot {
     this.onError = callbacks.onError
     this.onIndicatorsUpdate = callbacks.onIndicatorsUpdate
     this.onAISignal = callbacks.onAISignal
+    this.onTradeConfirmationRequired = callbacks.onTradeConfirmationRequired
   }
 
   // Start the trading bot
@@ -334,7 +354,7 @@ export class TradingBot {
     }
   }
 
-  // Execute trade
+  // Execute trade with confirmation support
   private async executeTrade(signal: 'buy' | 'sell', confidence: number): Promise<void> {
     if (!this.oandaAPI) return
 
@@ -368,6 +388,15 @@ export class TradingBot {
         strategy: 'AI-Technical'
       }
 
+      // Request confirmation if callback is set (for live trading)
+      if (this.onTradeConfirmationRequired) {
+        const confirmed = await this.onTradeConfirmationRequired(proposedTrade)
+        if (!confirmed) {
+          console.log(`❌ Trade cancelled by user: ${signal.toUpperCase()} ${positionSize} lots`)
+          return
+        }
+      }
+
       // Check if trade is allowed
       const canTrade = this.riskManager.canPlaceTrade(this.positions, proposedTrade)
       
@@ -399,13 +428,12 @@ export class TradingBot {
       console.log(`✅ Trade executed: ${signal.toUpperCase()} ${positionSize} lots at ${this.currentPrice}`)
 
     } catch (error) {
-      console.error('Failed to execute trade:', error)
       this.onError?.(`Trade execution failed: ${error}`)
     }
   }
 
-  // Close all positions
-  private async closeAllPositions(): Promise<void> {
+  // Close all positions (public method for emergency stops)
+  async closeAllPositions(): Promise<void> {
     if (!this.oandaAPI) return
 
     try {
@@ -417,6 +445,7 @@ export class TradingBot {
       this.onPositionUpdate?.(this.positions)
     } catch (error) {
       console.error('Failed to close positions:', error)
+      throw error
     }
   }
 
@@ -528,6 +557,46 @@ export class TradingBot {
     this.config = { ...this.config, ...newConfig }
     this.riskManager.updateConfig(this.config)
   }
+
+  // Get running state
+  getRunningState(): boolean {
+    return this.isRunning
+  }
+
+  // Get account balance from OANDA
+  async getAccountBalance(): Promise<number> {
+    if (!this.oandaAPI) {
+      throw new Error('OANDA API not initialized')
+    }
+    
+    try {
+      return await this.oandaAPI.getAccountBalance()
+    } catch (error) {
+      this.onError?.(`Failed to get account balance: ${error}`)
+      throw error
+    }
+  }
+
+  // Get current positions
+  async getPositions(): Promise<Position[]> {
+    if (!this.oandaAPI) {
+      throw new Error('OANDA API not initialized')
+    }
+    
+    try {
+      await this.updatePositions()
+      return this.positions
+    } catch (error) {
+      this.onError?.(`Failed to get positions: ${error}`)
+      throw error
+    }
+  }
+
+  // Get performance metrics
+  getPerformance(): Performance {
+    return { ...this.performance }
+  }
+
 }
 
 export default TradingBot 

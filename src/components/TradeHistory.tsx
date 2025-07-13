@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { useBotStore } from '../store/botStore'
-import { TrendingUp, TrendingDown, Clock, DollarSign, Filter } from 'lucide-react'
+import { TrendingUp, TrendingDown, Clock, DollarSign, Filter, AlertTriangle, History } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 const TradeHistory: React.FC = () => {
-  const { trades } = useBotStore()
+  const { trades, isConnected } = useBotStore()
   const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all')
   const [sortBy, setSortBy] = useState<'time' | 'pnl' | 'size'>('time')
 
@@ -37,143 +37,175 @@ const TradeHistory: React.FC = () => {
   const winRate = filteredTrades.length > 0 ? (winningTrades / filteredTrades.length) * 100 : 0
 
   return (
-    <div className="trading-card">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold flex items-center">
-          <Clock className="mr-2" size={20} />
-          Trade History
-        </h2>
-        <div className="flex items-center space-x-2">
-          <Filter size={16} className="text-gray-400" />
+    <div className="card">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="bg-purple-100 rounded-lg p-2">
+            <History className="w-5 h-5 text-purple-600" />
+          </div>
+          <h2 className="heading-md">Trade History</h2>
+        </div>
+
+        <div className="flex space-x-4">
+          {/* Filter */}
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as any)}
+              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Trades</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+
+          {/* Sort */}
           <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as any)}
-            className="text-sm border rounded px-2 py-1"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">All Trades</option>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
+            <option value="time">Sort by Time</option>
+            <option value="pnl">Sort by P&L</option>
+            <option value="size">Sort by Size</option>
           </select>
         </div>
       </div>
 
+      {/* Connection Status Warning */}
+      {!isConnected && (
+        <div className="alert alert-warning mb-6">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <h3 className="text-sm font-medium">Limited Functionality</h3>
+            <p className="text-sm mt-1">
+              Trade history shows local data only. Live trading requires OANDA connection.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-        <div className="text-center">
-          <div className="text-sm text-gray-600">Total Trades</div>
-          <div className="text-xl font-bold">{filteredTrades.length}</div>
+      <div className="grid-metrics mb-6">
+        <div className="metric-card">
+          <div className="metric-label">Total Trades</div>
+          <div className="metric-value">{filteredTrades.length}</div>
         </div>
-        <div className="text-center">
-          <div className="text-sm text-gray-600">Win Rate</div>
-          <div className="text-xl font-bold">{winRate.toFixed(1)}%</div>
+
+        <div className="metric-card">
+          <div className="metric-label">Win Rate</div>
+          <div className={`metric-value ${winRate > 50 ? 'metric-value-positive' : 'metric-value-negative'}`}>
+            {winRate.toFixed(1)}%
+          </div>
         </div>
-        <div className="text-center">
-          <div className="text-sm text-gray-600">Total P&L</div>
-          <div className={`text-xl font-bold ${
-            totalPnL >= 0 ? 'text-green-600' : 'text-red-600'
-          }`}>
+
+        <div className="metric-card">
+          <div className="metric-label">Total P&L</div>
+          <div className={`metric-value ${totalPnL >= 0 ? 'metric-value-positive' : 'metric-value-negative'}`}>
             {formatPnL(totalPnL)}
           </div>
         </div>
-      </div>
 
-      {/* Sort Options */}
-      <div className="flex space-x-2 mb-4">
-        <span className="text-sm text-gray-600">Sort by:</span>
-        {[
-          { value: 'time', label: 'Time' },
-          { value: 'pnl', label: 'P&L' },
-          { value: 'size', label: 'Size' }
-        ].map((option) => (
-          <button
-            key={option.value}
-            onClick={() => setSortBy(option.value as any)}
-            className={`text-sm px-2 py-1 rounded ${
-              sortBy === option.value
-                ? 'bg-trading-blue text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
+        <div className="metric-card">
+          <div className="metric-label">Data Source</div>
+          <div className={`text-sm font-medium ${isConnected ? 'text-green-600' : 'text-orange-600'}`}>
+            {isConnected ? '● Live OANDA' : '● Local Only'}
+          </div>
+        </div>
       </div>
 
       {/* Trade List */}
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {filteredTrades.map((trade) => (
-          <div key={trade.id} className="border rounded-lg p-4 hover:bg-gray-50">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-full ${
-                  trade.type === 'buy' ? 'bg-green-100' : 'bg-red-100'
-                }`}>
-                  {trade.type === 'buy' ? (
-                    <TrendingUp size={16} className="text-green-600" />
-                  ) : (
-                    <TrendingDown size={16} className="text-red-600" />
-                  )}
-                </div>
-                
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-semibold">{trade.pair}</span>
-                    <span className={`text-sm px-2 py-1 rounded ${
-                      trade.status === 'open' ? 'bg-blue-100 text-blue-800' :
-                      trade.status === 'closed' ? 'bg-gray-100 text-gray-800' :
-                      'bg-red-100 text-red-800'
+      {filteredTrades.length === 0 ? (
+        <div className="text-center py-12">
+          <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Trades Found</h3>
+          <p className="text-gray-500">
+            {!isConnected 
+              ? 'Connect to OANDA to start live trading and view trade history.'
+              : 'Start trading to see your trade history here.'
+            }
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredTrades.map((trade, index) => (
+            <div key={trade.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className={`flex items-center space-x-2 ${
+                      trade.type === 'buy' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {trade.type === 'buy' ? (
+                        <TrendingUp className="w-4 h-4" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4" />
+                      )}
+                      <span className="font-semibold">{trade.type.toUpperCase()}</span>
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                      {trade.pair} • {trade.size} lots
+                    </div>
+
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      trade.status === 'open' 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : trade.status === 'closed'
+                        ? 'bg-gray-100 text-gray-800'
+                        : 'bg-red-100 text-red-800'
                     }`}>
                       {trade.status}
-                    </span>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <div className="text-gray-600">Entry Price</div>
+                      <div className="font-medium">{formatPrice(trade.openPrice)}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-600">Stop Loss</div>
+                      <div className="font-medium">{trade.stopLoss ? formatPrice(trade.stopLoss) : 'N/A'}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-600">Take Profit</div>
+                      <div className="font-medium">{trade.takeProfit ? formatPrice(trade.takeProfit) : 'N/A'}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-600">Open Time</div>
+                      <div className="font-medium">{formatDistanceToNow(new Date(trade.openTime), { addSuffix: true })}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right ml-4">
+                  <div className={`text-lg font-bold ${
+                    (trade.pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {formatPnL(trade.pnl || 0)}
+                  </div>
+                  
                   <div className="text-sm text-gray-600">
-                    {formatDistanceToNow(new Date(trade.openTime), { addSuffix: true })}
+                    Strategy: {trade.strategy}
                   </div>
+
+                  {trade.confidence && (
+                    <div className="text-sm text-gray-600">
+                      Confidence: {(trade.confidence * 100).toFixed(0)}%
+                    </div>
+                  )}
                 </div>
               </div>
-              
-              <div className="text-right">
-                <div className="font-semibold">{formatPrice(trade.openPrice)}</div>
-                <div className="text-sm text-gray-600">{trade.size} lots</div>
-              </div>
             </div>
-            
-            <div className="mt-3 flex justify-between items-center">
-              <div className="flex items-center space-x-4 text-sm">
-                <span className="text-gray-600">
-                  SL: {formatPrice(trade.stopLoss)}
-                </span>
-                <span className="text-gray-600">
-                  TP: {formatPrice(trade.takeProfit)}
-                </span>
-                <span className="text-gray-600">
-                  Confidence: {(trade.confidence * 100).toFixed(0)}%
-                </span>
-              </div>
-              
-              {trade.pnl !== undefined && (
-                <div className={`flex items-center space-x-1 ${
-                  trade.pnl >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  <DollarSign size={14} />
-                  <span className="font-semibold">{formatPnL(trade.pnl)}</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="mt-2 text-xs text-gray-500">
-              Strategy: {trade.strategy}
-            </div>
-          </div>
-        ))}
-        
-        {filteredTrades.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <Clock size={48} className="mx-auto mb-2 opacity-50" />
-            <p>No trades found</p>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
